@@ -141,6 +141,10 @@ function AuthModal({
   const [busy, setBusy] = useState(false);
 
   const configured = isSupabaseConfigured();
+  const appRedirectUrl = new URL(
+    import.meta.env.BASE_URL,
+    window.location.origin,
+  ).toString();
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
   const googleCallbackUrl = projectUrl
     ? `${projectUrl.replace(/\/+$/, "")}/auth/v1/callback`
@@ -314,7 +318,7 @@ function AuthModal({
           email: email.trim(),
           password,
           options: {
-            emailRedirectTo: window.location.origin,
+            emailRedirectTo: appRedirectUrl,
             data: {
               full_name: fullName.trim(),
               username: username.trim().toLowerCase(),
@@ -373,7 +377,7 @@ function AuthModal({
       const { error } = await client.auth.resend({
         type: "signup",
         email: email.trim(),
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: appRedirectUrl },
       });
       if (error) {
         throw error;
@@ -405,7 +409,7 @@ function AuthModal({
       onAuthClientChanged(client);
       const { error } = await client.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: appRedirectUrl },
       });
       if (error) {
         throw error;
