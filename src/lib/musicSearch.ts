@@ -19,7 +19,7 @@ export async function searchYouTubeMusic(
   const apiBaseUrl =
     configuredApiBaseUrl ||
     (import.meta.env.BASE_URL === "/Tweak-Music-App/"
-      ? "https://tweak-music-api.onrender.com"
+      ? "https://tweak-music-app.onrender.com"
       : "");
   const endpoint = apiBaseUrl
     ? `${apiBaseUrl}/api/music/search`
