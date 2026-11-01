@@ -12,10 +12,22 @@ export async function searchYouTubeMusic(
   query: string,
   signal: AbortSignal,
 ): Promise<MusicSearchResult[]> {
+  const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(
+    /\/+$/,
+    "",
+  );
+  const apiBaseUrl =
+    configuredApiBaseUrl ||
+    (import.meta.env.BASE_URL === "/Tweak-Music-App/"
+      ? "https://tweak-music-api.onrender.com"
+      : "");
+  const endpoint = apiBaseUrl
+    ? `${apiBaseUrl}/api/music/search`
+    : "/api/music/search";
   let response: Response;
   try {
     response = await fetch(
-      `/api/music/search?q=${encodeURIComponent(query)}`,
+      `${endpoint}?q=${encodeURIComponent(query)}`,
       { signal },
     );
   } catch (error) {
@@ -23,7 +35,9 @@ export async function searchYouTubeMusic(
       throw error;
     }
     throw new Error(
-      "Music search API is unavailable. Restart Tweak with `npm run dev` and try again.",
+      apiBaseUrl
+        ? "The music search service is unavailable. Please try again later."
+        : "Music search API is unavailable. Restart Tweak with `npm run dev` and try again.",
     );
   }
 
@@ -31,7 +45,9 @@ export async function searchYouTubeMusic(
   if (!contentType.includes("application/json")) {
     if (!response.ok) {
       throw new Error(
-        "Music search API is not responding. Restart Tweak with `npm run dev` and try again.",
+        apiBaseUrl
+          ? "The music search service is not responding. Please try again later."
+          : "Music search API is not responding. Restart Tweak with `npm run dev` and try again.",
       );
     }
     throw new Error("Music search returned an unexpected response.");

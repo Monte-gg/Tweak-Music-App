@@ -16,6 +16,13 @@ const emailFrom = process.env.EMAIL_FROM;
 const otpHashSecret = process.env.OTP_HASH_SECRET;
 const appUrl = process.env.TWEAK_APP_URL ?? "http://localhost:5173";
 const port = Number(process.env.PORT ?? "3001");
+const allowedOrigins = new Set(
+  (process.env.ALLOWED_ORIGINS ??
+    "http://localhost:5173,http://127.0.0.1:5173,https://monte-gg.github.io")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean),
+);
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("PORT must be a valid TCP port.");
@@ -37,6 +44,23 @@ const app = express();
 
 app.disable("x-powered-by");
 app.set("trust proxy", process.env.TRUST_PROXY === "true" ? 1 : false);
+app.use((request, response, next) => {
+  const origin = request.header("origin");
+  if (origin && allowedOrigins.has(origin.replace(/\/+$/, ""))) {
+    response.setHeader("Access-Control-Allow-Origin", origin);
+    response.vary("Origin");
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, apikey",
+    );
+  }
+  if (request.method === "OPTIONS") {
+    response.sendStatus(204);
+    return;
+  }
+  next();
+});
 app.use(express.json({ limit: "10kb" }));
 app.use(
   "/api",

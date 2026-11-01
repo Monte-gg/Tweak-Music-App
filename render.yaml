@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: tweak-music-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:api
+    startCommand: npm run start:api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:5173,http://127.0.0.1:5173,https://monte-gg.github.io

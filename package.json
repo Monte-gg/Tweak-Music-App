@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:api": "tsx watch server/index.ts",
+    "build:api": "tsc --noEmit false --outDir dist-server -p tsconfig.server.json",
+    "start:api": "node dist-server/index.js",
     "build": "tsc -b && tsc --noEmit -p tsconfig.server.json && vite build",
     "preview": "vite preview"
   },
