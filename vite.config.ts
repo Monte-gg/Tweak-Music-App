@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS === "true" ? "/Tweak-Music-App/" : "/",
+  base: process.env.DEPLOY_TARGET === "github-pages" ? "/Tweak-Music-App/" : "/",
   plugins: [react()],
   server: {
     proxy: {

@@ -21,7 +21,7 @@ Recovery codes expire after 10 minutes, allow five verification attempts, and ar
 
 In production, serve the built frontend and API on the same origin or configure your host to proxy `/api` requests to the Express server.
 
-GitHub Pages deployment is handled by `.github/workflows/deploy-pages.yml`. Add the public `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as repository Actions variables so authentication is included in the build. After enabling Google, allow `https://monte-gg.github.io/Tweak-Music-App/` in Supabase **Authentication → URL Configuration** (including its subpaths). GitHub Pages only hosts static files; the Express email and music-search API requires a separate server deployment.
+The `gh-pages` branch contains the prebuilt GitHub Pages site. To create a Pages build on Windows, set `$env:DEPLOY_TARGET = "github-pages"` before running `npm.cmd run build`; the built assets will use the project-site path. GitHub Pages only hosts static files, so the Express email and music-search API requires a separate server deployment. After enabling Google, allow `https://monte-gg.github.io/Tweak-Music-App/` in Supabase **Authentication → URL Configuration**.
 
 The public preview is at `/`. Signed-in users are routed to `/app`; unauthenticated visits to `/app` return to the preview and open sign-in. Online discovery uses the official YouTube Data API, filters music-category results by title, duration, and disallowed terms, and prioritizes `- Topic` channels. Search results can be added to the queue or opened on YouTube Music. The Data API does not provide direct audio streams, so online tracks are not played inside Tweak; in-app playback requires an authorized audio source.
 
