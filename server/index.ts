@@ -91,7 +91,7 @@ const musicSearchLimiter = rateLimit({
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const excludedMusicTerms =
-  /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast|review|tutorial|lesson|dance (?:practice|video|tutorial)|choreograph(?:y|ic)?|coreograf\w*|challenge|lyrics?|karaoke|fan.?made|nightcore|sped up|slowed down|8d audio|visualizer)\b/i;
+  /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast|review|tutorial|lesson|dance (?:practice|video|tutorial)|choreograph(?:y|ic)?|coreograf\w*|challenge|lyrics?|karaoke|fan.?made|nightcore|sped up|slowed down|8d audio|visualizer|promo(?:tional)?|radio edit(?:s)?|clean ve?rsion)\b/i;
 const welcomeMessage =
   "Welcome to Tweak — your online discoveries and offline music, all in one place.";
 const recoveryRequestMessage =
