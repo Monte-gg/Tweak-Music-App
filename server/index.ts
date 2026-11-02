@@ -90,7 +90,8 @@ const musicSearchLimiter = rateLimit({
 });
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const excludedMusicTerms = /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast)\b/i;
+const excludedMusicTerms =
+  /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast|review|tutorial|lesson|dance practice|challenge)\b/i;
 const welcomeMessage =
   "Welcome to Tweak — your online discoveries and offline music, all in one place.";
 const recoveryRequestMessage =
@@ -186,6 +187,7 @@ app.get("/api/music/search", musicSearchLimiter, async (request, response) => {
     videoCategoryId: "10",
     order: "relevance",
     safeSearch: "moderate",
+    videoEmbeddable: "true",
     maxResults: "25",
     q: query,
   }).toString();
@@ -226,7 +228,7 @@ app.get("/api/music/search", musicSearchLimiter, async (request, response) => {
   const detailsUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
   detailsUrl.search = new URLSearchParams({
     key: apiKey,
-    part: "contentDetails",
+    part: "contentDetails,status",
     id: videoIds.join(","),
   }).toString();
   const detailsResponse = await fetch(detailsUrl, {
@@ -246,10 +248,12 @@ app.get("/api/music/search", musicSearchLimiter, async (request, response) => {
     items?: Array<{
       id?: string;
       contentDetails?: { duration?: string };
+      status?: { embeddable?: boolean };
     }>;
   };
   const durations = new Map(
     (detailsData.items ?? [])
+      .filter((item) => item.status?.embeddable === true)
       .map((item) => [item.id, durationInSeconds(item.contentDetails?.duration)] as const)
       .filter(
         (entry): entry is readonly [string, number] =>

@@ -11,6 +11,7 @@ export type Track = {
   cover: string;
   audioUrl?: string;
   externalUrl?: string;
+  youtubeVideoId?: string;
   artworkUrl?: string;
   localTrackId?: string;
 };
@@ -88,6 +89,14 @@ function activeTrack(queue: Track[], activeTrackId: string | null): Track | unde
 }
 
 export function hasPlayableSource(track: Track | undefined): boolean {
+  return Boolean(
+    track?.audioUrl ||
+      track?.youtubeVideoId ||
+      (track?.source === "local" && track.localTrackId),
+  );
+}
+
+export function hasNativeAudioSource(track: Track | undefined): boolean {
   return Boolean(
     track?.audioUrl || (track?.source === "local" && track.localTrackId),
   );

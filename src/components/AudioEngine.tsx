@@ -7,8 +7,12 @@ import {
   setDeckGain,
   type AudioGraph,
 } from "../lib/audioGraph";
-import { hasPlayableSource, useAudioStore } from "../stores/audioStore";
+import {
+  hasNativeAudioSource,
+  useAudioStore,
+} from "../stores/audioStore";
 import type { Track } from "../stores/audioStore";
+import YouTubePlayer from "./YouTubePlayer";
 
 type Deck = 0 | 1;
 type AudioElements = [HTMLAudioElement | null, HTMLAudioElement | null];
@@ -119,7 +123,7 @@ function AudioEngine() {
     if (
       !currentTrack ||
       !nextTrack ||
-      !hasPlayableSource(nextTrack) ||
+      !hasNativeAudioSource(nextTrack) ||
       !state.isAuthenticated ||
       !state.isPlaying ||
       fadeLength <= 0 ||
@@ -305,7 +309,7 @@ function AudioEngine() {
 
     const alreadyPrepared =
       currentTrack &&
-      hasPlayableSource(currentTrack) &&
+      hasNativeAudioSource(currentTrack) &&
       activeAudio.dataset.trackId === currentTrack.id;
     if (alreadyPrepared) {
       if (standbyAudio) {
@@ -339,7 +343,7 @@ function AudioEngine() {
     }
 
     const loadActiveSource = async () => {
-      if (!currentTrack || !hasPlayableSource(currentTrack)) {
+      if (!currentTrack || !hasNativeAudioSource(currentTrack)) {
         return;
       }
       const { source, objectUrl } = await resolveTrackSource(currentTrack);
@@ -481,7 +485,7 @@ function AudioEngine() {
   }, [crossfadeSeconds, setCrossfadeWarning]);
 
   useEffect(() => {
-    if (!hasPlayableSource(track) || !isAuthenticated || !isReady) {
+    if (!hasNativeAudioSource(track) || !isAuthenticated || !isReady) {
       return;
     }
     const audio = audioRefs[activeDeck].current;
@@ -530,7 +534,7 @@ function AudioEngine() {
     const state = useAudioStore.getState();
     if (
       deck === activeDeckRef.current &&
-      hasPlayableSource(track) &&
+      hasNativeAudioSource(track) &&
       audio.dataset.trackId === state.activeTrackId &&
       audio.currentSrc
     ) {
@@ -548,7 +552,7 @@ function AudioEngine() {
   function handleAudioError(deck: Deck, audio: HTMLAudioElement): void {
     if (
       deck === activeDeckRef.current &&
-      hasPlayableSource(track) &&
+      hasNativeAudioSource(track) &&
       audio.currentSrc
     ) {
       setReady(false);
@@ -559,6 +563,7 @@ function AudioEngine() {
   const decks: readonly Deck[] = [0, 1];
   return (
     <>
+      <YouTubePlayer />
       {decks.map((deck) => {
         const audioRef = audioRefs[deck];
         return (

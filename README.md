@@ -15,7 +15,7 @@ Tweak is a React + Vite music dashboard. Authentication uses Supabase and transa
 
 The browser anon key is intended for client-side use. Keep `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, and `OTP_HASH_SECRET` server-only; never prefix them with `VITE_`.
 
-Online search uses the official YouTube Data API v3, and requires a server-only YouTube API key. Results are filtered by music category, excluded-content terms, and duration, with `- Topic` channels prioritized. The browser only receives song metadata and YouTube Music links: it does not embed video or extract audio streams.
+Online search uses the official YouTube Data API v3, and requires a server-only YouTube API key. Results are filtered by music category, embeddability, excluded-content terms, and duration, with `- Topic` channels prioritized. Playable search results use YouTube's visible embedded player; Tweak does not extract audio streams.
 
 ## Deploy the YouTube search API to Render
 
@@ -44,6 +44,6 @@ In production, serve the built frontend and API on the same origin or configure 
 
 The `gh-pages` branch contains the prebuilt GitHub Pages site. To create a Pages build on Windows, set `$env:DEPLOY_TARGET = "github-pages"` before running `npm.cmd run build`; the built assets will use the project-site path. GitHub Pages only hosts static files, so the Express email and music-search API requires a separate server deployment. After enabling Google, allow `https://monte-gg.github.io/Tweak-Music-App/` in Supabase **Authentication → URL Configuration**.
 
-The public preview is at `/`. Signed-in users are routed to `/app`; unauthenticated visits to `/app` return to the preview and open sign-in. Online discovery uses the official YouTube Data API, filters music-category results by title, duration, and disallowed terms, and prioritizes `- Topic` channels. Search results can be added to the queue or opened on YouTube Music. The Data API does not provide direct audio streams, so online tracks are not played inside Tweak; in-app playback requires an authorized audio source.
+The public preview is at `/`. Signed-in users are routed to `/app`; unauthenticated visits to `/app` return to the preview and open sign-in. Online discovery uses the official YouTube Data API, filters embeddable music-category results by title, duration, and disallowed terms, and prioritizes `- Topic` channels. Search results can be played in Tweak's visible YouTube player, added to the queue, or opened on YouTube Music. Tweak does not extract audio streams.
 
 Signed-in users can import or scan a folder of MP3, FLAC, and WAV files in the Offline Studio. Audio tags are parsed locally in the browser, and the audio file plus editable title, artist, and album details are saved in IndexedDB on that device. Metadata edits do not rewrite the original file, and local audio is never uploaded by the library feature. Browser playback support depends on the selected file format and browser.

@@ -482,17 +482,26 @@ function App() {
     );
   }
 
-  function addSearchResultToQueue(result: MusicSearchResult) {
+  function addSearchResultToQueue(result: MusicSearchResult, play = false) {
+    const trackId = `youtube-${result.id}`;
     addToQueue({
-      id: `youtube-${result.id}`,
+      id: trackId,
       title: result.title,
       artist: result.artist,
       source: "online",
       duration: result.duration,
       cover: "cover-pink",
       externalUrl: result.youtubeMusicUrl,
+      youtubeVideoId: result.id,
       artworkUrl: result.thumbnailUrl,
     });
+    if (play) {
+      if (!user) {
+        openAuth("signin");
+        return;
+      }
+      playTrack(trackId);
+    }
   }
 
   async function importFiles(files: readonly File[]) {
@@ -657,7 +666,7 @@ function App() {
             <div className="search-results" role="region" aria-label="Music search results">
               <div className="search-results-heading">
                 <span>Music discovery</span>
-                <small>Official YouTube results</small>
+                <small>Music videos and official audio</small>
               </div>
               {searchLoading && (
                 <p className="search-status" role="status">
@@ -695,6 +704,15 @@ function App() {
                       <small>{result.artist} · {formatTime(result.duration)}</small>
                     </span>
                     <span className="search-result-actions">
+                      <button
+                        type="button"
+                        className="search-result-play"
+                        onClick={() => addSearchResultToQueue(result, true)}
+                        aria-label={`Play ${result.title}`}
+                        title="Play"
+                      >
+                        <Play size={13} fill="currentColor" />
+                      </button>
                       <button
                         type="button"
                         onClick={() => addSearchResultToQueue(result)}
@@ -1319,18 +1337,7 @@ function App() {
                   {track.source.toUpperCase()}
                 </span></span>
                 <span className="queue-time">{formatTime(track.duration)}</span>
-                {track.externalUrl ? (
-                  <a
-                    className="queue-more queue-play"
-                    href={track.externalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Open ${track.title} in YouTube Music`}
-                    title="Open in YouTube Music"
-                  >
-                    <ExternalLink size={13} />
-                  </a>
-                ) : (
+                <span className="queue-actions">
                   <button
                     className="queue-more queue-play"
                     type="button"
@@ -1340,7 +1347,19 @@ function App() {
                   >
                     <Play size={13} fill="currentColor" />
                   </button>
-                )}
+                  {track.externalUrl && (
+                    <a
+                      className="queue-more"
+                      href={track.externalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${track.title} in YouTube Music`}
+                      title="Open in YouTube Music"
+                    >
+                      <ExternalLink size={13} />
+                    </a>
+                  )}
+                </span>
               </div>
             ))}
           </div>
