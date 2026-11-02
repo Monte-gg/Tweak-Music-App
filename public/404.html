@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tweak — Redirecting</title>
+    <script>
+      const base = "/Tweak-Music-App/";
+      const prefix = base.slice(0, -1);
+      const route = location.pathname.startsWith(prefix)
+        ? location.pathname.slice(prefix.length) || "/"
+        : "/";
+      try {
+        sessionStorage.setItem(
+          "tweak-pages-route",
+          `${route}${location.search}${location.hash}`,
+        );
+      } catch (error) {
+        console.warn("The Tweak route could not be saved for redirect.", error);
+      }
+      location.replace(base);
+    </script>
+  </head>
+  <body>
+    <p>Opening Tweak…</p>
+  </body>
+</html>

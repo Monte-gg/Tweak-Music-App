@@ -37,6 +37,7 @@ type AudioState = {
   updateTrackMetadata: (trackId: string, title: string, artist: string) => void;
   removeFromQueue: (trackId: string) => void;
   clearQueue: () => void;
+  clearQueueForSource: (source: TrackSource) => void;
   setActiveTrack: (trackId: string) => void;
   playTrack: (trackId: string) => void;
   togglePlayback: () => void;
@@ -55,33 +56,6 @@ type AudioState = {
   setDuration: (duration: number) => void;
   setPlaybackError: (message: string | null) => void;
 };
-
-const initialQueue: Track[] = [
-  {
-    id: "midnight-city",
-    title: "Midnight City",
-    artist: "M83",
-    source: "online",
-    duration: 243,
-    cover: "cover-pink",
-  },
-  {
-    id: "sweet-disposition",
-    title: "Sweet Disposition",
-    artist: "The Temper Trap",
-    source: "local",
-    duration: 234,
-    cover: "cover-orange",
-  },
-  {
-    id: "tadow",
-    title: "Tadow",
-    artist: "Masego, FKJ",
-    source: "online",
-    duration: 302,
-    cover: "cover-green",
-  },
-];
 
 function activeTrack(queue: Track[], activeTrackId: string | null): Track | undefined {
   return queue.find((track) => track.id === activeTrackId);
@@ -109,13 +83,13 @@ function canPlayTrack(state: Pick<AudioState, "isAuthenticated" | "queue" | "act
 }
 
 export const useAudioStore = create<AudioState>((set, get) => ({
-  queue: initialQueue,
-  activeTrackId: initialQueue[0]?.id ?? null,
+  queue: [],
+  activeTrackId: null,
   isPlaying: false,
   isAuthenticated: false,
   isReady: false,
   currentTime: 0,
-  duration: initialQueue[0]?.duration ?? 0,
+  duration: 0,
   volume: 0.8,
   equalizerGains: Array.from({ length: 10 }, () => 0),
   bassBoost: 0,
@@ -149,12 +123,15 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   removeFromQueue: (trackId) =>
     set((state) => {
+      const removedTrack = activeTrack(state.queue, trackId);
       const queue = state.queue.filter((track) => track.id !== trackId);
       if (state.activeTrackId !== trackId) {
         return { queue };
       }
 
-      const nextTrack = queue[0];
+      const nextTrack = queue.find(
+        (track) => track.source === removedTrack?.source,
+      );
       return {
         queue,
         activeTrackId: nextTrack?.id ?? null,
@@ -178,6 +155,25 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       seekSequence: state.seekSequence + 1,
       playbackError: null,
     })),
+
+  clearQueueForSource: (source) =>
+    set((state) => {
+      const queue = state.queue.filter((track) => track.source !== source);
+      if (activeTrack(state.queue, state.activeTrackId)?.source !== source) {
+        return { queue };
+      }
+
+      return {
+        queue,
+        activeTrackId: null,
+        isPlaying: false,
+        isReady: false,
+        currentTime: 0,
+        duration: 0,
+        seekSequence: state.seekSequence + 1,
+        playbackError: null,
+      };
+    }),
 
   setActiveTrack: (trackId) =>
     set((state) => {
@@ -232,8 +228,12 @@ export const useAudioStore = create<AudioState>((set, get) => ({
 
   next: () =>
     set((state) => {
-      const index = state.queue.findIndex((track) => track.id === state.activeTrackId);
-      const nextTrack = state.queue[index + 1];
+      const currentTrack = activeTrack(state.queue, state.activeTrackId);
+      const sameSourceQueue = currentTrack
+        ? state.queue.filter((track) => track.source === currentTrack.source)
+        : state.queue;
+      const index = sameSourceQueue.findIndex((track) => track.id === state.activeTrackId);
+      const nextTrack = sameSourceQueue[index + 1];
       if (!nextTrack) {
         return { isPlaying: false };
       }
@@ -254,8 +254,12 @@ export const useAudioStore = create<AudioState>((set, get) => ({
       get().seekTo(0);
       return;
     }
-    const index = state.queue.findIndex((track) => track.id === state.activeTrackId);
-    const previousTrack = state.queue[index - 1];
+    const currentTrack = activeTrack(state.queue, state.activeTrackId);
+    const sameSourceQueue = currentTrack
+      ? state.queue.filter((track) => track.source === currentTrack.source)
+      : state.queue;
+    const index = sameSourceQueue.findIndex((track) => track.id === state.activeTrackId);
+    const previousTrack = sameSourceQueue[index - 1];
     if (previousTrack) {
       get().playTrack(previousTrack.id);
     } else {

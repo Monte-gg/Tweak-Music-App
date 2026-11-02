@@ -9,13 +9,13 @@ import {
   Check,
   ChevronDown,
   Cloud,
+  CloudOff,
   Disc3,
   FolderOpen,
   Headphones,
   Heart,
   Library,
   LoaderCircle,
-  ListMusic,
   LockKeyhole,
   LogOut,
   Moon,
@@ -27,15 +27,17 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  ShieldCheck,
   Sparkles,
   Sun,
   Trash2,
+  UserRound,
   Volume2,
   Waves,
   X,
 } from "lucide-react";
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import AudioEngine from "./components/AudioEngine";
 import AuthModal, { type AuthMode } from "./components/AuthModal";
 import SpectrumVisualizer from "./components/SpectrumVisualizer";
@@ -51,6 +53,7 @@ import { getSupabaseClient } from "./lib/supabase";
 import {
   formatTime,
   hasPlayableSource,
+  type Track,
   useAudioStore,
 } from "./stores/audioStore";
 
@@ -106,6 +109,42 @@ function readFavoriteTrackIds(): string[] {
   }
 }
 
+function isStoredTrack(value: unknown): value is Track {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const track = value as Record<string, unknown>;
+  const optionalStrings = [
+    "audioUrl",
+    "youtubeVideoId",
+    "artworkUrl",
+    "localTrackId",
+  ];
+  return (
+    typeof track.id === "string" &&
+    typeof track.title === "string" &&
+    typeof track.artist === "string" &&
+    (track.source === "online" || track.source === "local") &&
+    typeof track.duration === "number" &&
+    Number.isFinite(track.duration) &&
+    typeof track.cover === "string" &&
+    optionalStrings.every(
+      (key) => track[key] === undefined || typeof track[key] === "string",
+    )
+  );
+}
+
+function readFavoriteTrackDetails(): Track[] {
+  try {
+    const saved = window.localStorage.getItem("tweak-favorite-track-details");
+    const parsed: unknown = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed) ? parsed.filter(isStoredTrack) : [];
+  } catch (error) {
+    console.warn("Unable to read saved track details.", error);
+    return [];
+  }
+}
+
 function BrandMark() {
   return (
     <span className="brand-mark" aria-hidden="true">
@@ -157,6 +196,9 @@ function App() {
   const [studioMenuOpen, setStudioMenuOpen] = useState(false);
   const [playerMenuOpen, setPlayerMenuOpen] = useState(false);
   const [favoriteTrackIds, setFavoriteTrackIds] = useState<string[]>(readFavoriteTrackIds);
+  const [favoriteTrackDetails, setFavoriteTrackDetails] = useState<Track[]>(
+    readFavoriteTrackDetails,
+  );
   const [searchResults, setSearchResults] = useState<MusicSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState("");
@@ -178,9 +220,23 @@ function App() {
   const [savingMetadata, setSavingMetadata] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const currentView =
+    location.pathname === "/app/offline"
+      ? "offline"
+      : location.pathname === "/app/profile"
+        ? "profile"
+        : "online";
   const queue = useAudioStore((state) => state.queue);
+  const onlineQueue = queue.filter(
+    (track) => track.source === "online" && hasPlayableSource(track),
+  );
+  const offlineQueue = queue.filter(
+    (track) => track.source === "local" && hasPlayableSource(track),
+  );
+  const visibleQueue = currentView === "offline" ? offlineQueue : onlineQueue;
   const activeTrackId = useAudioStore((state) => state.activeTrackId);
   const activeTrack = queue.find((track) => track.id === activeTrackId);
+  const onlineActiveTrack = activeTrack?.source === "online" ? activeTrack : undefined;
   const isPlaying = useAudioStore((state) => state.isPlaying);
   const currentTime = useAudioStore((state) => state.currentTime);
   const duration = useAudioStore((state) => state.duration);
@@ -200,17 +256,17 @@ function App() {
   const addToQueue = useAudioStore((state) => state.addToQueue);
   const updateTrackMetadata = useAudioStore((state) => state.updateTrackMetadata);
   const removeFromQueue = useAudioStore((state) => state.removeFromQueue);
-  const clearQueue = useAudioStore((state) => state.clearQueue);
+  const clearQueueForSource = useAudioStore((state) => state.clearQueueForSource);
   const seekTo = useAudioStore((state) => state.seekTo);
   const setVolume = useAudioStore((state) => state.setVolume);
   const setEqualizerGain = useAudioStore((state) => state.setEqualizerGain);
   const setBassBoost = useAudioStore((state) => state.setBassBoost);
   const setCrossfadeSeconds = useAudioStore((state) => state.setCrossfadeSeconds);
   const setNormalizerEnabled = useAudioStore((state) => state.setNormalizerEnabled);
-  const canPlay = Boolean(user && hasPlayableSource(activeTrack));
-  const activeQueueIndex = queue.findIndex((track) => track.id === activeTrackId);
+  const canPlay = Boolean(user && hasPlayableSource(onlineActiveTrack));
+  const activeQueueIndex = onlineQueue.findIndex((track) => track.id === activeTrackId);
   const visualProgress =
-    hasPlayableSource(activeTrack) && duration > 0
+    hasPlayableSource(onlineActiveTrack) && duration > 0
       ? Math.min(currentTime / duration, 1)
       : 0.31;
 
@@ -220,6 +276,41 @@ function App() {
     user?.email?.split("@")[0] ||
     "Guest";
   const displayInitial = displayName.slice(0, 1).toUpperCase();
+  const searchedTracks: Track[] = searchResults.map((result) => ({
+    id: `youtube-${result.id}`,
+    title: result.title,
+    artist: result.artist,
+    source: "online",
+    duration: result.duration,
+    cover: "cover-pink",
+    youtubeVideoId: result.id,
+    artworkUrl: result.thumbnailUrl,
+  }));
+  const featuredOnlineTracks =
+    searchedTracks.length > 0
+      ? searchedTracks.slice(0, 3)
+      : onlineQueue.slice(-3).reverse();
+  const savedTracks = favoriteTrackIds
+    .map(
+      (trackId) =>
+        favoriteTrackDetails.find((track) => track.id === trackId) ??
+        queue.find((track) => track.id === trackId) ??
+        (() => {
+          const localTrack = localTracks.find((track) => track.id === trackId);
+          return localTrack
+            ? {
+                id: localTrack.id,
+                title: localTrack.title,
+                artist: localTrack.artist,
+                source: "local" as const,
+                duration: localTrack.duration,
+                cover: "cover-orange",
+                localTrackId: localTrack.id,
+              }
+            : undefined;
+        })(),
+    )
+    .filter((track): track is Track => Boolean(track));
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -240,6 +331,17 @@ function App() {
       console.warn("Unable to save favorite tracks.", error);
     }
   }, [favoriteTrackIds]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "tweak-favorite-track-details",
+        JSON.stringify(favoriteTrackDetails),
+      );
+    } catch (error) {
+      console.warn("Unable to save favorite track details.", error);
+    }
+  }, [favoriteTrackDetails]);
 
   useEffect(() => {
     setAuthenticated(Boolean(user));
@@ -295,6 +397,11 @@ function App() {
   }, [searchOpen]);
 
   useEffect(() => {
+    if (currentView === "offline") {
+      setSearchOpen(false);
+      return;
+    }
+
     const query = searchQuery.trim();
     if (query.length < 2) {
       setSearchResults([]);
@@ -328,7 +435,7 @@ function App() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [searchQuery]);
+  }, [currentView, searchQuery]);
 
   useEffect(() => {
     if (!authClient) {
@@ -437,13 +544,13 @@ function App() {
     }
 
     if (user) {
-      if (location.pathname !== "/app") {
+      if (!["/app", "/app/offline", "/app/profile"].includes(location.pathname)) {
         navigate("/app", { replace: true });
       }
       return;
     }
 
-    if (location.pathname === "/app") {
+    if (location.pathname.startsWith("/app")) {
       setAuthMode("signin");
       setAuthOpen(true);
       navigate("/", { replace: true });
@@ -471,34 +578,51 @@ function App() {
   }
 
   function toggleFavorite() {
-    if (!activeTrack) {
+    if (!onlineActiveTrack) {
       return;
     }
+    toggleFavoriteTrack(onlineActiveTrack);
+  }
+
+  function toggleFavoriteTrack(track: Track) {
     setFavoriteTrackIds((favorites) =>
-      favorites.includes(activeTrack.id)
-        ? favorites.filter((id) => id !== activeTrack.id)
-        : [...favorites, activeTrack.id],
+      favorites.includes(track.id)
+        ? favorites.filter((id) => id !== track.id)
+        : [...favorites, track.id],
+    );
+    setFavoriteTrackDetails((tracks) =>
+      tracks.some((favorite) => favorite.id === track.id)
+        ? tracks.filter((favorite) => favorite.id !== track.id)
+        : [...tracks, track],
     );
   }
 
+  function playMusicTrack(track: Track) {
+    if (!user) {
+      openAuth("signin");
+      return;
+    }
+    if (track.source === "local") {
+      navigate("/app/offline");
+    } else {
+      navigate("/app");
+    }
+    addToQueue(track);
+    playTrack(track.id);
+  }
+
   function addSearchResultToQueue(result: MusicSearchResult, play = false) {
-    const trackId = `youtube-${result.id}`;
-    addToQueue({
-      id: trackId,
-      title: result.title,
-      artist: result.artist,
-      source: "online",
-      duration: result.duration,
-      cover: "cover-pink",
-      youtubeVideoId: result.id,
-      artworkUrl: result.thumbnailUrl,
-    });
+    const track = searchedTracks.find((item) => item.id === `youtube-${result.id}`);
+    if (!track) {
+      return;
+    }
+    addToQueue(track);
     if (play) {
       if (!user) {
         openAuth("signin");
         return;
       }
-      playTrack(trackId);
+      playTrack(track.id);
     }
     setSearchOpen(false);
   }
@@ -548,6 +672,24 @@ function App() {
     });
   }
 
+  function playLocalTrack(track: LocalAudioRecord) {
+    addLocalTrackToQueue(track);
+    playTrack(track.id);
+  }
+
+  function playOfflineLibrary() {
+    if (!user) {
+      openAuth("signin");
+      return;
+    }
+    if (localTracks.length === 0) {
+      fileInputRef.current?.click();
+      return;
+    }
+    localTracks.forEach(addLocalTrackToQueue);
+    playTrack(localTracks[0].id);
+  }
+
   function beginMetadataEdit(track: LocalAudioRecord) {
     setEditingTrack(track);
     setEditTitle(track.title);
@@ -575,6 +717,13 @@ function App() {
         tracks.map((track) => (track.id === updated.id ? updated : track)),
       );
       updateTrackMetadata(updated.id, updated.title, updated.artist);
+      setFavoriteTrackDetails((tracks) =>
+        tracks.map((track) =>
+          track.id === updated.id
+            ? { ...track, title: updated.title, artist: updated.artist }
+            : track,
+        ),
+      );
       setEditingTrack(null);
     } catch (error) {
       setMetadataError(
@@ -593,6 +742,12 @@ function App() {
       await removeLocalTrack(track.id);
       setLocalTracks((tracks) => tracks.filter((item) => item.id !== track.id));
       removeFromQueue(track.id);
+      setFavoriteTrackIds((favorites) =>
+        favorites.filter((id) => id !== track.id),
+      );
+      setFavoriteTrackDetails((tracks) =>
+        tracks.filter((favorite) => favorite.id !== track.id),
+      );
       if (editingTrack?.id === track.id) {
         setEditingTrack(null);
       }
@@ -627,7 +782,7 @@ function App() {
 
   return (
     <main
-      className={`app-shell min-h-screen ${user && hasPlayableSource(activeTrack) ? "has-persistent-player" : ""}`}
+      className={`app-shell min-h-screen ${user && hasPlayableSource(activeTrack) && activeTrack?.source === (currentView === "offline" ? "local" : "online") ? "has-persistent-player" : ""}`}
     >
       <svg className="svg-defs" aria-hidden="true">
         <defs>
@@ -643,6 +798,7 @@ function App() {
           <span>tweak<span className="brand-period">.</span></span>
         </Link>
 
+        {currentView !== "offline" && (
         <div className="search-wrap" ref={searchContainerRef}>
           <label className="search-field">
             <Search size={17} />
@@ -728,6 +884,7 @@ function App() {
             </div>
           )}
         </div>
+        )}
 
         <div className="topbar-actions">
           <button
@@ -767,12 +924,30 @@ function App() {
                 <span className="avatar">{displayInitial}</span>
                 <span className="profile-copy">
                   <strong>{displayName}</strong>
-                  <small>Free listener</small>
+                  <small>Music listener</small>
                 </span>
                 <ChevronDown size={15} />
               </button>
               {profileMenuOpen && (
                 <div className="profile-menu">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      navigate("/app/profile");
+                    }}
+                  >
+                    <UserRound size={15} /> View profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      navigate("/app/offline");
+                    }}
+                  >
+                    <CloudOff size={15} /> Offline library
+                  </button>
                   <button type="button" onClick={handleSignOut}>
                     <LogOut size={15} /> Sign out
                   </button>
@@ -791,6 +966,42 @@ function App() {
         </div>
       </header>
 
+      {user && (
+        <nav className="music-navigation" aria-label="Music spaces">
+          <NavLink
+            to="/app"
+            end
+            className={({ isActive }) =>
+              `music-navigation-link ${isActive ? "is-active" : ""}`
+            }
+          >
+            <Headphones size={15} /> Listen
+          </NavLink>
+          <NavLink
+            to="/app/offline"
+            className={({ isActive }) =>
+              `music-navigation-link ${isActive ? "is-active" : ""}`
+            }
+          >
+            <CloudOff size={15} /> Offline library
+          </NavLink>
+          <NavLink
+            to="/app/profile"
+            className={({ isActive }) =>
+              `music-navigation-link ${isActive ? "is-active" : ""}`
+            }
+          >
+            <UserRound size={15} /> Profile
+          </NavLink>
+          <span className="music-navigation-spacer" />
+          {currentView === "online" && (
+            <NavLink className="go-offline-button" to="/app/offline">
+              <ArrowDownToLine size={14} /> Go offline
+            </NavLink>
+          )}
+        </nav>
+      )}
+
       {authError && (
         <p className="auth-status" role="alert">
           {authError}
@@ -803,16 +1014,48 @@ function App() {
       <section className="welcome-row">
         <div>
           <p className="eyebrow welcome-eyebrow">
-            {user ? "YOUR SPACE, YOUR SOUND" : "GUEST PREVIEW DASHBOARD"}
+            {currentView === "offline"
+              ? "ON THIS DEVICE ONLY"
+              : currentView === "profile"
+                ? "YOUR TWEAK ACCOUNT"
+                : user
+                  ? "YOUR SPACE, YOUR SOUND"
+                  : "GUEST PREVIEW DASHBOARD"}
           </p>
-          <h1>Good evening, {displayName} <span>✦</span></h1>
+          <h1>
+            {currentView === "offline"
+              ? "Your offline library"
+              : currentView === "profile"
+                ? "Your profile"
+                : `Good evening, ${displayName}`}
+            {currentView === "online" && <span> ✦</span>}
+          </h1>
           <p className="welcome-copy">
-            {user
-              ? "A little more of what moves you."
-              : "Explore the hub. Sign in when you’re ready to listen."}
+            {currentView === "offline"
+              ? "Only music files saved on this device appear here. Online discovery stays separate."
+              : currentView === "profile"
+                ? "Your account, saved music, and listening spaces in one place."
+                : user
+                  ? "A little more of what moves you."
+                  : "Explore the hub. Sign in when you’re ready to listen."}
           </p>
         </div>
-        {user ? (
+        {currentView === "offline" ? (
+          <button
+            className="customize-button"
+            type="button"
+            onClick={playOfflineLibrary}
+          >
+            {localTracks.length > 0
+              ? <Play size={14} fill="currentColor" />
+              : <Plus size={14} />}
+            {localTracks.length > 0 ? "Play offline" : "Add music"}
+          </button>
+        ) : currentView === "profile" ? (
+          <Link className="customize-button" to="/app">
+            <Headphones size={14} /> Back to listening
+          </Link>
+        ) : user ? (
           <button className="customize-button" type="button" onClick={scrollToSoundControls}>
             <SlidersHorizontal size={15} /> Tune sound
           </button>
@@ -828,18 +1071,81 @@ function App() {
       </section>
 
       <section
-        className="dashboard-grid"
-        aria-label={user ? "Tweak music dashboard" : "Guest preview dashboard"}
+        className={`dashboard-grid ${currentView === "offline" ? "offline-dashboard" : ""} ${currentView === "profile" ? "profile-dashboard" : ""}`}
+        aria-label={
+          currentView === "offline"
+            ? "Offline music library"
+            : currentView === "profile"
+              ? "Listener profile"
+              : user
+                ? "Tweak music dashboard"
+                : "Guest preview dashboard"
+        }
       >
+        {currentView === "online" && (
         <article className="panel discoveries-panel">
           <SectionTitle
             eyebrow="TUNED TO YOU"
-            title="Find your frequency"
-            action="Explore"
+            title={featuredOnlineTracks.length ? "Your next favorite" : "Find your frequency"}
+            action={featuredOnlineTracks.length ? undefined : "Explore"}
             onAction={() => searchFromDashboard("new music")}
           />
-          <div className="discovery-grid">
-            {discoveries.map((item, index) => (
+          {featuredOnlineTracks.length > 0 ? (
+            <div className="music-card-grid">
+              {featuredOnlineTracks.map((track) => {
+                const queued = onlineQueue.some((item) => item.id === track.id);
+                const liked = favoriteTrackIds.includes(track.id);
+                return (
+                  <article className="music-card" key={track.id}>
+                    <div className="music-card-art">
+                      {track.artworkUrl ? (
+                        <img src={track.artworkUrl} alt="" loading="lazy" />
+                      ) : (
+                        <span className={`music-card-fallback ${track.cover}`}>
+                          <Music2 size={26} />
+                        </span>
+                      )}
+                      <button
+                        className="music-card-play"
+                        type="button"
+                        aria-label={`Play ${track.title}`}
+                        onClick={() => playMusicTrack(track)}
+                      >
+                        <Play size={17} fill="currentColor" />
+                      </button>
+                    </div>
+                    <div className="music-card-copy">
+                      <strong title={track.title}>{track.title}</strong>
+                      <small title={track.artist}>{track.artist}</small>
+                      <div className="music-card-actions">
+                        <button
+                          type="button"
+                          className={liked ? "is-favorite" : ""}
+                          aria-label={liked ? `Unlike ${track.title}` : `Like ${track.title}`}
+                          aria-pressed={liked}
+                          onClick={() => toggleFavoriteTrack(track)}
+                        >
+                          <Heart size={14} fill={liked ? "currentColor" : "none"} />
+                          {liked ? "Saved" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={queued}
+                          aria-label={queued ? `${track.title} is in your queue` : `Add ${track.title} to queue`}
+                          onClick={() => addToQueue(track)}
+                        >
+                          {queued ? <Check size={14} /> : <Plus size={14} />}
+                          {queued ? "Queued" : "Queue"}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="discovery-grid">
+              {discoveries.map((item, index) => (
               <button
                 className="discovery-card"
                 type="button"
@@ -858,15 +1164,18 @@ function App() {
                 </span>
                 <span className="round-arrow"><ArrowRight size={14} /></span>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
           <div className="discovery-footer">
             <span className="online-indicator" />
-            Fresh picks, updated for your mood
+            {featuredOnlineTracks.length ? "Official music videos and audio" : "Fresh picks, updated for your mood"}
             <span className="footer-sparkle"><Sparkles size={14} /></span>
           </div>
         </article>
+        )}
 
+        {currentView === "offline" && (
         <article className="panel studio-panel">
           <div className="studio-heading">
             <div className="studio-icon"><Library size={19} /></div>
@@ -913,11 +1222,9 @@ function App() {
             </div>
           </div>
           <p className="eyebrow">YOUR COLLECTION</p>
-          <h2>Offline studio</h2>
+          <h2>Music on this device</h2>
           <p className="studio-copy">
-            {user
-              ? "Your files stay on this device."
-              : "Sign in to add music to your private library."}
+            Your imported MP3, FLAC, and WAV files stay in this browser on this device.
           </p>
           <input
             ref={fileInputRef}
@@ -1009,6 +1316,14 @@ function App() {
                 const queued = queue.some((item) => item.id === track.id);
                 return (
                   <div className="local-library-row" key={track.id}>
+                    <button
+                      type="button"
+                      className="library-action local-library-play"
+                      aria-label={`Play ${track.title} offline`}
+                      onClick={() => playLocalTrack(track)}
+                    >
+                      <Play size={13} fill="currentColor" />
+                    </button>
                     <span className="local-library-copy">
                       <strong>{track.title}</strong>
                       <small>
@@ -1026,6 +1341,28 @@ function App() {
                       onClick={() => addLocalTrackToQueue(track)}
                     >
                       {queued ? <Check size={14} /> : <Plus size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      className={`library-action ${favoriteTrackIds.includes(track.id) ? "is-favorite" : ""}`}
+                      aria-label={favoriteTrackIds.includes(track.id) ? `Remove ${track.title} from saved music` : `Save ${track.title}`}
+                      title={favoriteTrackIds.includes(track.id) ? "Remove from saved music" : "Save track"}
+                      onClick={() =>
+                        toggleFavoriteTrack({
+                          id: track.id,
+                          title: track.title,
+                          artist: track.artist,
+                          source: "local",
+                          duration: track.duration,
+                          cover: "cover-orange",
+                          localTrackId: track.id,
+                        })
+                      }
+                    >
+                      <Heart
+                        size={13}
+                        fill={favoriteTrackIds.includes(track.id) ? "currentColor" : "none"}
+                      />
                     </button>
                     <button
                       type="button"
@@ -1053,10 +1390,12 @@ function App() {
           <div className="studio-stats">
             <span><Disc3 size={15} /> <strong>{user ? localTracks.length : 0}</strong> tracks</span>
             <span className="stat-divider" />
-            <span><Cloud size={15} /> Your library stays yours</span>
+            <span><CloudOff size={15} /> Stored on this device</span>
           </div>
         </article>
+        )}
 
+        {currentView === "online" && (
         <article className="panel player-panel">
           <div className="player-topline">
             <div className="player-label">
@@ -1097,9 +1436,9 @@ function App() {
             </div>
             <div className="track-info">
               <p className="eyebrow">SUGGESTED FOR YOU</p>
-              <h2>{activeTrack?.title ?? "Nothing queued"}</h2>
+              <h2>{onlineActiveTrack?.title ?? "Nothing queued"}</h2>
               <p className="track-artist">
-                {activeTrack?.artist ?? "Add a track to your queue"}
+                {onlineActiveTrack?.artist ?? "Add a track to your queue"}
               </p>
               <SpectrumVisualizer />
               <input
@@ -1124,10 +1463,8 @@ function App() {
           </div>
           <div className="player-controls">
             <span className="source-pill">
-              {activeTrack?.source === "local"
-                ? <ArrowDownToLine size={12} />
-                : <Cloud size={12} />}
-              {activeTrack?.source?.toUpperCase() ?? "QUEUE"}
+              <Cloud size={12} />
+              {onlineActiveTrack?.source.toUpperCase() ?? "QUEUE"}
             </span>
             <div className="transport">
               <button
@@ -1154,7 +1491,7 @@ function App() {
                 type="button"
                 className="transport-button"
                 aria-label="Next track"
-                disabled={!canPlay || activeQueueIndex >= queue.length - 1}
+                disabled={!canPlay || activeQueueIndex >= onlineQueue.length - 1}
                 onClick={nextTrack}
               >
                 <ArrowRight size={17} />
@@ -1176,21 +1513,21 @@ function App() {
               />
             </label>
             <button
-              className={`icon-button like-button ${activeTrack && favoriteTrackIds.includes(activeTrack.id) ? "is-favorite" : ""}`}
+              className={`icon-button like-button ${onlineActiveTrack && favoriteTrackIds.includes(onlineActiveTrack.id) ? "is-favorite" : ""}`}
               type="button"
-              aria-label={activeTrack && favoriteTrackIds.includes(activeTrack.id) ? "Unlike track" : "Like track"}
-              aria-pressed={Boolean(activeTrack && favoriteTrackIds.includes(activeTrack.id))}
-              disabled={!activeTrack}
+              aria-label={onlineActiveTrack && favoriteTrackIds.includes(onlineActiveTrack.id) ? "Unlike track" : "Like track"}
+              aria-pressed={Boolean(onlineActiveTrack && favoriteTrackIds.includes(onlineActiveTrack.id))}
+              disabled={!onlineActiveTrack}
               onClick={toggleFavorite}
-              title={activeTrack && favoriteTrackIds.includes(activeTrack.id) ? "Remove from favorites" : "Add to favorites"}
+              title={onlineActiveTrack && favoriteTrackIds.includes(onlineActiveTrack.id) ? "Remove from favorites" : "Add to favorites"}
             >
-              <Heart size={17} fill={activeTrack && favoriteTrackIds.includes(activeTrack.id) ? "currentColor" : "none"} />
+              <Heart size={17} fill={onlineActiveTrack && favoriteTrackIds.includes(onlineActiveTrack.id) ? "currentColor" : "none"} />
             </button>
           </div>
           {playbackError && <p className="player-error" role="alert">{playbackError}</p>}
           {user ? (
             <div className="member-player-note">
-              {hasPlayableSource(activeTrack)
+              {hasPlayableSource(onlineActiveTrack)
                 ? "Playback is ready."
                 : "Add a playable local file or online stream to listen."}
             </div>
@@ -1207,7 +1544,9 @@ function App() {
             </div>
           )}
         </article>
+        )}
 
+        {currentView === "online" && (
         <article className="panel sound-panel">
           <SectionTitle eyebrow="MAKE IT YOURS" title="Sound, shaped by you" />
           <div className="sound-feature">
@@ -1292,7 +1631,9 @@ function App() {
             </p>
           )}
         </article>
+        )}
 
+        {currentView === "online" && (
         <article className="panel queue-panel">
           <div className="queue-heading">
             <SectionTitle eyebrow="YOUR NEXT LISTEN" title="Up next" />
@@ -1308,7 +1649,11 @@ function App() {
             <div className="queue-row queue-header">
               <span>#</span><span>TRACK</span><span>SOURCE</span><span>TIME</span><span />
             </div>
-            {queue.map((track, index) => (
+            {visibleQueue.length === 0 ? (
+              <p className="queue-empty" role="status">
+                Your online queue is empty. Search for music and add a track to get started.
+              </p>
+            ) : visibleQueue.map((track, index) => (
               <div
                 className={`queue-row ${track.id === activeTrackId ? "is-active" : ""}`}
                 key={track.id}
@@ -1344,23 +1689,154 @@ function App() {
             ))}
           </div>
           <div className="queue-footer">
-            <span><ListMusic size={14} /> A mix of online and offline, all in one place.</span>
+            <span><Cloud size={14} /> Online music queue</span>
             <button
               className="text-button"
               type="button"
-              disabled={queue.length === 0}
-              onClick={clearQueue}
+              disabled={visibleQueue.length === 0}
+              onClick={() => clearQueueForSource("online")}
             >
               Clear queue <Trash2 size={13} />
             </button>
           </div>
         </article>
+        )}
+
+        {currentView === "offline" && offlineQueue.length > 0 && (
+          <article className="panel queue-panel offline-queue-panel">
+            <div className="queue-heading">
+              <SectionTitle eyebrow="SAVED ON THIS DEVICE" title="Offline play queue" />
+              <button
+                className="queue-add"
+                type="button"
+                onClick={playOfflineLibrary}
+              >
+                <Play size={14} fill="currentColor" /> Play all
+              </button>
+            </div>
+            <div className="offline-track-list">
+              {offlineQueue.map((track, index) => (
+                <button
+                  className={`offline-track-row ${track.id === activeTrackId ? "is-active" : ""}`}
+                  key={track.id}
+                  type="button"
+                  onClick={() => playTrack(track.id)}
+                >
+                  <span>{index + 1}</span>
+                  <span className="offline-track-copy">
+                    <strong>{track.title}</strong>
+                    <small>{track.artist}</small>
+                  </span>
+                  <span>{formatTime(track.duration)}</span>
+                  {track.id === activeTrackId && isPlaying
+                    ? <Pause size={15} />
+                    : <Play size={14} />}
+                </button>
+              ))}
+            </div>
+          </article>
+        )}
+
+        {currentView === "profile" && user && (
+          <section className="profile-content">
+            <article className="panel profile-overview">
+              <div className="profile-hero">
+                <span className="profile-avatar-large">{displayInitial}</span>
+                <div>
+                  <p className="eyebrow">LISTENER PROFILE</p>
+                  <h2>{displayName}</h2>
+                  <p>{user.email ?? "Email not available"}</p>
+                </div>
+                <button
+                  className="profile-signout"
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                >
+                  <LogOut size={14} /> Sign out
+                </button>
+              </div>
+              <div className="profile-stats">
+                <div><strong>{favoriteTrackIds.length}</strong><span>Saved tracks</span></div>
+                <div><strong>{onlineQueue.length}</strong><span>Online queue</span></div>
+                <div><strong>{localTracks.length}</strong><span>Offline tracks</span></div>
+              </div>
+            </article>
+
+            <div className="profile-content-grid">
+              <article className="panel profile-details">
+                <p className="eyebrow">ACCOUNT DETAILS</p>
+                <h2>Your account</h2>
+                <dl>
+                  <div><dt>Display name</dt><dd>{displayName}</dd></div>
+                  <div><dt>Email</dt><dd>{user.email ?? "Not available"}</dd></div>
+                  <div><dt>Member since</dt><dd>{new Date(user.created_at).toLocaleDateString()}</dd></div>
+                  <div><dt>Listening mode</dt><dd>Online discovery + device library</dd></div>
+                </dl>
+                <p className="profile-privacy-note">
+                  <ShieldCheck size={15} />
+                  Your imported audio stays in this browser; it is not uploaded to Tweak.
+                </p>
+              </article>
+
+              <article className="panel profile-saved">
+                <div className="profile-saved-heading">
+                  <div>
+                    <p className="eyebrow">YOUR COLLECTION</p>
+                    <h2>Saved music</h2>
+                  </div>
+                  <Heart size={17} />
+                </div>
+                {savedTracks.length === 0 ? (
+                  <div className="profile-empty">
+                    <Heart size={21} />
+                    <p>No saved tracks yet.</p>
+                    <Link to="/app">Explore music and tap Save on a track.</Link>
+                  </div>
+                ) : (
+                  <div className="profile-saved-list">
+                    {savedTracks.map((track) => (
+                      <div className="profile-saved-row" key={track.id}>
+                        {track.artworkUrl ? (
+                          <img src={track.artworkUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span className="profile-saved-art"><Music2 size={15} /></span>
+                        )}
+                        <span><strong>{track.title}</strong><small>{track.artist}</small></span>
+                        <button
+                          type="button"
+                          aria-label={`Play ${track.title}`}
+                          onClick={() => playMusicTrack(track)}
+                        >
+                          <Play size={14} fill="currentColor" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${track.title} from saved music`}
+                          onClick={() => toggleFavoriteTrack(track)}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </div>
+
+            <div className="profile-shortcuts">
+              <Link to="/app"><Headphones size={16} /><span><strong>Listen online</strong><small>Search for music videos and audio</small></span><ArrowRight size={15} /></Link>
+              <Link to="/app/offline"><CloudOff size={16} /><span><strong>Offline library</strong><small>Play files stored on this device</small></span><ArrowRight size={15} /></Link>
+            </div>
+          </section>
+        )}
       </section>
 
+      {currentView !== "offline" && (
       <footer className="page-footer">
         <span><BrandMark /> A calmer way to listen.</span>
         <span><Check size={13} /> Your music. Your rules.</span>
       </footer>
+      )}
       <AudioEngine />
       {editingTrack && (
         <div className="metadata-dialog-backdrop">

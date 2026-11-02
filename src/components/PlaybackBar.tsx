@@ -11,6 +11,7 @@ import {
   hasPlayableSource,
   useAudioStore,
 } from "../stores/audioStore";
+import { useLocation } from "react-router-dom";
 
 type YouTubePlayerInstance = {
   destroy: () => void;
@@ -122,12 +123,14 @@ function youtubeErrorMessage(code: number): string {
 }
 
 function PlaybackBar() {
+  const location = useLocation();
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const timerRef = useRef<number | null>(null);
   const queue = useAudioStore((state) => state.queue);
   const activeTrackId = useAudioStore((state) => state.activeTrackId);
   const activeTrack = queue.find((track) => track.id === activeTrackId);
+  const activeMode = location.pathname === "/app/offline" ? "local" : "online";
   const videoId = activeTrack?.youtubeVideoId;
   const isAuthenticated = useAudioStore((state) => state.isAuthenticated);
   const isPlaying = useAudioStore((state) => state.isPlaying);
@@ -143,12 +146,24 @@ function PlaybackBar() {
   const previousTrack = useAudioStore((state) => state.previous);
   const nextTrack = useAudioStore((state) => state.next);
   const seekTo = useAudioStore((state) => state.seekTo);
+  const sameSourceQueue = activeTrack
+    ? queue.filter((track) => track.source === activeTrack.source)
+    : [];
+  const activeSourceIndex = sameSourceQueue.findIndex(
+    (track) => track.id === activeTrack?.id,
+  );
   const canPlayPrevious = activeTrack
-    ? queue.findIndex((track) => track.id === activeTrack.id) > 0
+    ? activeSourceIndex > 0
     : false;
   const canPlayNext = activeTrack
-    ? queue.findIndex((track) => track.id === activeTrack.id) < queue.length - 1
+    ? activeSourceIndex < sameSourceQueue.length - 1
     : false;
+
+  useEffect(() => {
+    if (activeTrack && activeTrack.source !== activeMode) {
+      useAudioStore.getState().pause();
+    }
+  }, [activeMode, activeTrack?.source]);
 
   useEffect(() => {
     if (!videoId || !isAuthenticated || !mountRef.current) {
@@ -237,6 +252,7 @@ function PlaybackBar() {
       playerRef.current = null;
     };
   }, [
+    activeMode,
     isAuthenticated,
     setCurrentTime,
     setDuration,
@@ -269,7 +285,12 @@ function PlaybackBar() {
     player.seekTo(useAudioStore.getState().currentTime, true);
   }, [isAuthenticated, seekSequence, videoId]);
 
-  if (!activeTrack || !isAuthenticated || !hasPlayableSource(activeTrack)) {
+  if (
+    !activeTrack ||
+    activeTrack.source !== activeMode ||
+    !isAuthenticated ||
+    !hasPlayableSource(activeTrack)
+  ) {
     return null;
   }
 

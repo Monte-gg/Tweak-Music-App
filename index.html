@@ -12,6 +12,17 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      try {
+        const route = sessionStorage.getItem("tweak-pages-route");
+        if (route) {
+          sessionStorage.removeItem("tweak-pages-route");
+          history.replaceState(null, "", `/Tweak-Music-App${route}`);
+        }
+      } catch (error) {
+        console.warn("The Tweak deep link could not be restored.", error);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
