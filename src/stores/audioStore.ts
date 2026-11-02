@@ -10,7 +10,6 @@ export type Track = {
   duration: number;
   cover: string;
   audioUrl?: string;
-  externalUrl?: string;
   youtubeVideoId?: string;
   artworkUrl?: string;
   localTrackId?: string;

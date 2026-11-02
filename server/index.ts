@@ -91,7 +91,7 @@ const musicSearchLimiter = rateLimit({
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const excludedMusicTerms =
-  /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast|review|tutorial|lesson|dance practice|challenge)\b/i;
+  /\b(?:vlog|interview|behind the scenes|trailer|reaction|podcast|review|tutorial|lesson|dance practice|challenge|lyrics?|karaoke|fan.?made|nightcore|sped up|slowed down|8d audio|visualizer)\b/i;
 const welcomeMessage =
   "Welcome to Tweak — your online discoveries and offline music, all in one place.";
 const recoveryRequestMessage =
@@ -140,6 +140,21 @@ type YouTubeSearchItem = {
     thumbnails?: Record<string, { url?: string }>;
   };
 };
+
+function decodeYouTubeText(value: string): string {
+  return value.replace(
+    /&(amp|quot|apos|#39|lt|gt);/g,
+    (entity) =>
+      ({
+        "&amp;": "&",
+        "&quot;": '"',
+        "&apos;": "'",
+        "&#39;": "'",
+        "&lt;": "<",
+        "&gt;": ">",
+      })[entity] ?? entity,
+  );
+}
 
 app.get("/api/health", (_request, response) => {
   response.json({
@@ -281,7 +296,7 @@ app.get("/api/music/search", musicSearchLimiter, async (request, response) => {
       const isTopicChannel = /\s-\sTopic$/i.test(channelTitle);
       return [{
         id,
-        title: snippet.title,
+        title: decodeYouTubeText(snippet.title),
         artist: isTopicChannel
           ? channelTitle.replace(/\s-\sTopic$/i, "")
           : channelTitle,
@@ -292,12 +307,11 @@ app.get("/api/music/search", musicSearchLimiter, async (request, response) => {
           snippet.thumbnails?.medium?.url ??
           snippet.thumbnails?.default?.url ??
           "",
-        youtubeMusicUrl: `https://music.youtube.com/watch?v=${encodeURIComponent(id)}`,
         isTopicChannel,
       }];
     })
     .sort((left, right) => Number(right.isTopicChannel) - Number(left.isTopicChannel))
-    .slice(0, 12)
+    .slice(0, 6)
     .map(({ isTopicChannel: _isTopicChannel, ...result }) => result);
 
   response.json({ results });

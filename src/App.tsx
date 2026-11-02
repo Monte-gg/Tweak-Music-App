@@ -10,7 +10,6 @@ import {
   ChevronDown,
   Cloud,
   Disc3,
-  ExternalLink,
   FolderOpen,
   Headphones,
   Heart,
@@ -491,7 +490,6 @@ function App() {
       source: "online",
       duration: result.duration,
       cover: "cover-pink",
-      externalUrl: result.youtubeMusicUrl,
       youtubeVideoId: result.id,
       artworkUrl: result.thumbnailUrl,
     });
@@ -502,6 +500,7 @@ function App() {
       }
       playTrack(trackId);
     }
+    setSearchOpen(false);
   }
 
   async function importFiles(files: readonly File[]) {
@@ -627,7 +626,9 @@ function App() {
   }
 
   return (
-    <main className="app-shell min-h-screen">
+    <main
+      className={`app-shell min-h-screen ${user && hasPlayableSource(activeTrack) ? "has-persistent-player" : ""}`}
+    >
       <svg className="svg-defs" aria-hidden="true">
         <defs>
           <linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -720,15 +721,6 @@ function App() {
                       >
                         <Plus size={13} /> {queued ? "Queued" : "Queue"}
                       </button>
-                      <a
-                        href={result.youtubeMusicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open ${result.title} in YouTube Music`}
-                        title="Open in YouTube Music"
-                      >
-                        <ExternalLink size={14} />
-                      </a>
                     </span>
                   </div>
                 );
@@ -1347,18 +1339,6 @@ function App() {
                   >
                     <Play size={13} fill="currentColor" />
                   </button>
-                  {track.externalUrl && (
-                    <a
-                      className="queue-more"
-                      href={track.externalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Open ${track.title} in YouTube Music`}
-                      title="Open in YouTube Music"
-                    >
-                      <ExternalLink size={13} />
-                    </a>
-                  )}
                 </span>
               </div>
             ))}

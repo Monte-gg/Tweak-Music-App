@@ -1,5 +1,13 @@
 import { useEffect, useRef } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
+  Music2,
+  Pause,
+  Play,
+  Volume2,
+} from "lucide-react";
+import {
   hasPlayableSource,
   useAudioStore,
 } from "../stores/audioStore";
@@ -113,7 +121,7 @@ function youtubeErrorMessage(code: number): string {
   return "YouTube could not play this music video.";
 }
 
-function YouTubePlayer() {
+function PlaybackBar() {
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -123,24 +131,24 @@ function YouTubePlayer() {
   const videoId = activeTrack?.youtubeVideoId;
   const isAuthenticated = useAudioStore((state) => state.isAuthenticated);
   const isPlaying = useAudioStore((state) => state.isPlaying);
+  const isReady = useAudioStore((state) => state.isReady);
+  const currentTime = useAudioStore((state) => state.currentTime);
+  const duration = useAudioStore((state) => state.duration);
   const volume = useAudioStore((state) => state.volume);
   const seekSequence = useAudioStore((state) => state.seekSequence);
   const setCurrentTime = useAudioStore((state) => state.setCurrentTime);
   const setDuration = useAudioStore((state) => state.setDuration);
   const setReady = useAudioStore((state) => state.setReady);
   const setPlaybackError = useAudioStore((state) => state.setPlaybackError);
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadYouTubeIframeApi().catch((error: unknown) => {
-      if (!cancelled) {
-        console.error("Tweak could not preload YouTube's music player.", error);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const previousTrack = useAudioStore((state) => state.previous);
+  const nextTrack = useAudioStore((state) => state.next);
+  const seekTo = useAudioStore((state) => state.seekTo);
+  const canPlayPrevious = activeTrack
+    ? queue.findIndex((track) => track.id === activeTrack.id) > 0
+    : false;
+  const canPlayNext = activeTrack
+    ? queue.findIndex((track) => track.id === activeTrack.id) < queue.length - 1
+    : false;
 
   useEffect(() => {
     if (!videoId || !isAuthenticated || !mountRef.current) {
@@ -160,7 +168,7 @@ function YouTubePlayer() {
           videoId,
           playerVars: {
             autoplay: useAudioStore.getState().isPlaying ? 1 : 0,
-            controls: 1,
+            controls: 0,
             playsinline: 1,
             rel: 0,
             origin: window.location.origin,
@@ -261,21 +269,111 @@ function YouTubePlayer() {
     player.seekTo(useAudioStore.getState().currentTime, true);
   }, [isAuthenticated, seekSequence, videoId]);
 
-  if (!videoId || !isAuthenticated || !hasPlayableSource(activeTrack)) {
+  if (!activeTrack || !isAuthenticated || !hasPlayableSource(activeTrack)) {
     return null;
   }
 
   return (
-    <aside className="youtube-player-dock" aria-label="YouTube music player">
-      <div className="youtube-player-heading">
-        <span>Now playing on YouTube</span>
-        <strong>{activeTrack.title}</strong>
+    <aside className="playback-bar" aria-label="Now playing">
+      <div className="playback-bar-source">
+        {videoId ? (
+          <div
+            key={videoId}
+            ref={mountRef}
+            title={`Video for ${activeTrack.title}`}
+          />
+        ) : activeTrack.artworkUrl ? (
+          <img src={activeTrack.artworkUrl} alt="" />
+        ) : (
+          <Music2 size={32} />
+        )}
       </div>
-      <div className="youtube-player-frame">
-        <div key={videoId} ref={mountRef} />
+      <div className="playback-bar-controls">
+        <div className="playback-bar-track">
+          {activeTrack.artworkUrl && (
+            <img src={activeTrack.artworkUrl} alt="" loading="lazy" />
+          )}
+          <div>
+            <strong>{activeTrack.title}</strong>
+            <span>{activeTrack.artist}</span>
+            <small>
+              {videoId ? "Music video provided by YouTube" : "From your library"}
+            </small>
+          </div>
+        </div>
+        <div className="playback-bar-transport">
+          <button
+            type="button"
+            className="transport-button"
+            aria-label="Previous track"
+            disabled={!canPlayPrevious}
+            onClick={previousTrack}
+          >
+            <ArrowLeft size={17} />
+          </button>
+          <button
+            type="button"
+            className="play-button"
+            aria-label={isPlaying ? "Pause playback" : "Play"}
+            onClick={() => {
+              const state = useAudioStore.getState();
+              if (state.isPlaying) {
+                state.pause();
+              } else {
+                state.play();
+              }
+            }}
+          >
+            {isPlaying
+              ? <Pause size={16} fill="currentColor" />
+              : <Play size={16} fill="currentColor" />}
+          </button>
+          <button
+            type="button"
+            className="transport-button"
+            aria-label="Next track"
+            disabled={!canPlayNext}
+            onClick={nextTrack}
+          >
+            <ArrowRight size={17} />
+          </button>
+        </div>
+        <div className="playback-bar-seek">
+          <span>{formatPlayerTime(currentTime)}</span>
+          <input
+            type="range"
+            min={0}
+            max={duration || activeTrack.duration}
+            step={1}
+            value={Math.min(currentTime, duration || activeTrack.duration)}
+            aria-label="Seek through current track"
+            disabled={!isReady}
+            onChange={(event) => seekTo(Number(event.target.value))}
+          />
+          <span>{formatPlayerTime(duration || activeTrack.duration)}</span>
+        </div>
+        <label className="playback-bar-volume">
+          <Volume2 size={15} />
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            aria-label="Volume"
+            onChange={(event) =>
+              useAudioStore.getState().setVolume(Number(event.target.value))
+            }
+          />
+        </label>
       </div>
     </aside>
   );
 }
 
-export default YouTubePlayer;
+function formatPlayerTime(seconds: number): string {
+  const total = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+export default PlaybackBar;

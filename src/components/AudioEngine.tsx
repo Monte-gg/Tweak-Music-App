@@ -12,7 +12,7 @@ import {
   useAudioStore,
 } from "../stores/audioStore";
 import type { Track } from "../stores/audioStore";
-import YouTubePlayer from "./YouTubePlayer";
+import PlaybackBar from "./PlaybackBar";
 
 type Deck = 0 | 1;
 type AudioElements = [HTMLAudioElement | null, HTMLAudioElement | null];
@@ -390,6 +390,12 @@ function AudioEngine() {
       return;
     }
 
+    if (!hasNativeAudioSource(track)) {
+      activeAudio.pause();
+      standbyAudio.pause();
+      return;
+    }
+
     if (!isAuthenticated || !isPlaying) {
       activeAudio.pause();
       standbyAudio.pause();
@@ -563,7 +569,7 @@ function AudioEngine() {
   const decks: readonly Deck[] = [0, 1];
   return (
     <>
-      <YouTubePlayer />
+      <PlaybackBar />
       {decks.map((deck) => {
         const audioRef = audioRefs[deck];
         return (

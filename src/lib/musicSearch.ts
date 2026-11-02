@@ -5,7 +5,6 @@ export type MusicSearchResult = {
   channelTitle: string;
   duration: number;
   thumbnailUrl: string;
-  youtubeMusicUrl: string;
 };
 
 export async function searchYouTubeMusic(
