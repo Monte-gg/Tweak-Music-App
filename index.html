@@ -9,10 +9,21 @@
       content="Tweak brings your online discoveries and offline music together."
     />
     <title>Tweak — Your sound, your way</title>
-    <script type="module" crossorigin src="/Tweak-Music-App/assets/index-ClCENcvG.js"></script>
-    <link rel="stylesheet" crossorigin href="/Tweak-Music-App/assets/index-BS3Dctfa.css">
+    <script type="module" crossorigin src="/Tweak-Music-App/assets/index-aWVSGsx_.js"></script>
+    <link rel="stylesheet" crossorigin href="/Tweak-Music-App/assets/index-CD4CwFb3.css">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"></div>
+    <script>
+      try {
+        const route = sessionStorage.getItem("tweak-pages-route");
+        if (route) {
+          sessionStorage.removeItem("tweak-pages-route");
+          history.replaceState(null, "", `/Tweak-Music-App${route}`);
+        }
+      } catch (error) {
+        console.warn("The Tweak deep link could not be restored.", error);
+      }
+    </script>
   </body>
 </html>

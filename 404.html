@@ -3,16 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b0c10" />
-    <meta
-      name="description"
-      content="Tweak brings your online discoveries and offline music together."
-    />
-    <title>Tweak — Your sound, your way</title>
-    <script type="module" crossorigin src="/Tweak-Music-App/assets/index-ClCENcvG.js"></script>
-    <link rel="stylesheet" crossorigin href="/Tweak-Music-App/assets/index-BS3Dctfa.css">
+    <title>Tweak — Redirecting</title>
+    <script>
+      const base = "/Tweak-Music-App/";
+      const prefix = base.slice(0, -1);
+      const route = location.pathname.startsWith(prefix)
+        ? location.pathname.slice(prefix.length) || "/"
+        : "/";
+      try {
+        sessionStorage.setItem(
+          "tweak-pages-route",
+          `${route}${location.search}${location.hash}`,
+        );
+      } catch (error) {
+        console.warn("The Tweak route could not be saved for redirect.", error);
+      }
+      location.replace(base);
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <p>Opening Tweak…</p>
   </body>
 </html>
